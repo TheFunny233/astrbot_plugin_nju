@@ -36,7 +36,7 @@ class NJUPlugin(Star):
         except Exception:
             await self.terminate()
             raise
-        logger.info('NJU 通知接口已启动；请在插件通知通道视图复制地址')
+        logger.info('NJU小工具管理bot 通知接口已启动；请在插件通知通道视图复制地址')
 
     async def receive(self, req):
         try:
