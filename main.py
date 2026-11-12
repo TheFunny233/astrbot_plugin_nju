@@ -7,6 +7,7 @@ from astrbot.api.star import Context, Star
 from astrbot.api.web import error_response, json_response, request
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 from .service import NotificationService
+from .targets import qq_platforms, recipient_fields
 
 class NJUPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -52,12 +53,19 @@ class NJUPlugin(Star):
     async def channels(self):
         if self.service is None:
             return error_response('通知服务尚未就绪', status_code=503)
-        return json_response({'channels': [{**c, 'url': self._url(c)} for c in self.service.channels()], 'public_base_url': self.config.get('public_base_url', ''), 'modules': self.service.status()})
+        return json_response({'channels': [{**c, **recipient_fields(c), 'url': self._url(c)} for c in self.service.channels()],
+                              'platforms': qq_platforms(self.context),
+                              'public_base_url': self.config.get('public_base_url', ''), 'modules': self.service.status()})
 
     async def save_channel(self):
         try:
-            channel = self.service.save_channel(await request.json(default={}))
-            return json_response({**channel, 'url': self._url(channel)})
+            payload = await request.json(default={})
+            if not isinstance(payload, dict):
+                raise ValueError('配置格式不正确')
+            if 'platform_id' in payload and payload['platform_id'] not in {p['id'] for p in qq_platforms(self.context)}:
+                raise ValueError('所选 QQ 机器人已不存在，请刷新列表后重选')
+            channel = self.service.save_channel(payload)
+            return json_response({**channel, **recipient_fields(channel), 'url': self._url(channel)})
         except (ValueError, TypeError) as error:
             return error_response(str(error), status_code=400)
 
