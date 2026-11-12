@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NJU 通知通道</title><link rel="stylesheet" href="./style.css"></head>
+<body><main><h1>通知通道</h1><p>每条 API 只通知它绑定的群聊和私聊。复制后，粘贴到 APP 或 Web 的「Bot 通知」设置。</p>
+<p id="status" role="status"></p><div id="modules"></div><button id="refresh">刷新</button>
+<section><h2 id="heading">新建通道</h2><form id="form"><label>通道名称<input id="name" required maxlength="80" placeholder="例如：高数签到通知"></label>
+<label>业务<select id="module"><option value="checkin">签到</option><option value="course">抢课（待拓展）</option><option value="venue">抢场（待拓展）</option></select></label>
+<label>接收会话（每行一个，可同时填写群聊和私聊）<textarea id="targets" rows="5" required placeholder="在目标群聊或私聊中，由 AstrBot 管理员发送 /nju会话，然后粘贴返回的标识"></textarea></label>
+<label><input type="checkbox" id="enabled" checked>启用通道</label><button type="submit">保存通道</button><button id="cancel" type="button">取消编辑</button></form></section>
+<div id="channels"></div><p>API 地址包含发送凭证，请妥善保存。重置 API 后，旧地址立即失效，需要重新粘贴到客户端。</p></main><script type="module" src="./app.js"></script></body></html>

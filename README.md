@@ -1,9 +1,70 @@
-# helloworld
+# NJU 校园通知插件 2.0
 
-AstrBot 插件模板
+轻量 AstrBot 插件，接收 APP / Web 的签到结果，只发送到每条通道明确绑定的群聊和私聊。同一个 Bot 可创建多个 API，各自独立控制接收范围。
 
-A template plugin for AstrBot plugin feature
+## 快速接入
 
-# 支持
+1. 在 AstrBot 通过本仓库地址安装。需要 AstrBot 4.29.4 或更新版本，使用插件可视化视图和 `astrbot.api.web`。
+2. 插件配置填写 `public_base_url`，例如 `https://bot.example.com`。通知监听默认 `0.0.0.0:9285`，可修改 `listen_host` / `listen_port`。Docker 需要映射此端口；反向代理到该端口。
+3. 在要接收通知的每个群聊或私聊里，由 AstrBot 管理员发送 `/nju会话`，复制返回的完整会话标识（包含机器人平台实例、消息类型和会话 ID）。不是只填群号 / QQ 号。
+4. 在插件详情 →「通知通道」视图新建通道，选择签到、填写会话标识，每行一个。可以同时绑定多个群聊和私聊。
+5. 保存后点击「复制 API」。APP / Web → 设置 → Bot 通知 → 粘贴 API → 开启并保存 → 发送测试通知。
 
-[帮助文档](https://astrbot.app)
+群聊/私聊选择通过完整会话标识保留机器人实例信息，避免多个 QQ 机器人同群时串发。不会自动枚举或广播到所有群聊。QQ 平台必须支持主动发送且机器人在目标会话中具有发送权限；接口返回 accepted 只表示入队，具体失败可在管理页查看。
+
+## 通道管理
+
+- 支持创建、编辑、启用/关闭、删除和重置 API。最多 100 个通道，每通道最多 30 个接收会话。
+- 每个通道有独立的 256 位随机凭证。修改接收范围不改变 API；重置 API 立即撤销旧凭证；删除通道会取消尚未发送的通知。
+- 关闭通道拒绝新通知，暂停队列；重新开启后继续发送。移除的接收会话不会继续收到尚未发送的通知；已经进入平台发送过程的消息无法撤回。
+- 地址含发送凭证，不能公开分享。外网部署使用 HTTPS，并在反向代理上关闭通知路径的访问日志或遮蔽凭证路径；插件自身不记录该路径。
+- 管理接口走 AstrBot Dashboard 的登录鉴权；外部通知端口只提供 POST 上报，不提供管理接口。
+
+## 三个独立业务模块
+
+| 业务 | 接口 | 当前状态 |
+| --- | --- | --- |
+| 签到 | `/api/v1/checkin/<channel>/<token>` | 已实现 |
+| 抢课 | `/api/v1/course/<channel>/<token>` | 预留，默认关闭，启用后返回 501 |
+| 抢场 | `/api/v1/venue/<channel>/<token>` | 预留，默认关闭，启用后返回 501 |
+
+模块分别导入，具有独立发送工作协程和每模块 3000 条队列上限；一个模块导入/格式化失败、超时或积压不影响其他模块。每个目标独立投递、最多尝试三次，8 秒超时，10/20 秒重试间隔；单个群聊失败不会阻断其他群聊或私聊。
+
+队列和去重记录使用 SQLite 保存在 AstrBot 的 `data/plugin_data/astrbot_plugin_nju/notifications.sqlite`，重载/重启恢复。保留七天，每小时按需清理。相同通道、相同 event_id 七天内只入队一次；失败目标不会导致已成功的目标在普通重试时重复发送。平台已接收但本地未收到确认时仍可能重复，无法承诺端到端恰好一次。
+
+这是同进程内的业务故障隔离；AstrBot 整体停止、磁盘损坏、进程崩溃或恶意阻塞事件循环会影响整个插件。插件不运行签到或抢课抢场脚本，也不接受任意系统命令。
+
+## 接口约定 v1
+
+复制出来的完整地址示例：`https://bot.example.com/api/v1/checkin/<channel>/<token>`。
+
+`POST`，`Content-Type: application/json`，请求体上限 256 KiB：
+
+```json
+{
+  "version": 1,
+  "event_id": "client-generated-unique-id",
+  "source": "app",
+  "activity_name": "高等数学",
+  "finished_at": "2026-11-12T12:00:00Z",
+  "results": [{"name": "同学甲", "ok": true}, {"name": "同学乙", "ok": false}]
+}
+```
+
+测试通知使用 `{ "version": 1, "event_id": "unique-test-id", "test": true }`。
+
+- 202：持久化入队，`accepted: true`。
+- 200：重复事件，`duplicate: true`，不重复入队。
+- 400：输入格式不正确；401：地址凭证无效/撤销；403：通道关闭。
+- 429：当前业务积压，请稍后用相同 event_id 重试；501：预留业务；503：模块不可用。
+
+仅展示明确字段，不把上报内容作为指令、富文本或模型提示执行。姓名和消息长度受限，最多列出 30 人，优先失败人员；不发送密码、Cookie、学号、位置、原始签到链接或原始错误正文。
+
+## 验证与发布
+
+```sh
+python -m unittest discover -s tests -v
+python -m compileall -q main.py service.py modules
+```
+
+业务与队列测试不依赖 AstrBot；实际 QQ 送达还需要安装插件后配置适配器，并在目标会话执行连接测试。本插件不会替用户安装或配置 QQ 机器人平台。

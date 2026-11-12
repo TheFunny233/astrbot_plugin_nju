@@ -1,0 +1,5 @@
+{
+  "listen_host": {"type":"string","description":"通知接口监听地址","default":"0.0.0.0"},
+  "listen_port": {"type":"int","description":"通知接口端口","default":9285},
+  "public_base_url": {"type":"string","description":"通知接口外部地址","hint":"例如 https://bot.example.com，反向代理到通知端口 9285。填写后在通知通道视图复制完整 API。","default":""}
+}
