@@ -4,10 +4,11 @@ from aiohttp import web
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star
+from astrbot.api.platform import Platform
 from astrbot.api.web import error_response, json_response, request
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 from .service import NotificationService
-from .targets import qq_platforms, recipient_fields
+from .targets import notification_platforms, prepare_destination, recipient_fields
 
 class NJUPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -22,6 +23,8 @@ class NJUPlugin(Star):
         directory = Path(get_astrbot_data_path()) / 'plugin_data' / 'astrbot_plugin_nju'
         directory.mkdir(parents=True, exist_ok=True)
         async def send(target, text):
+            instance = self.context.get_platform_inst(target.split(':', 1)[0])
+            prepare_destination(instance, target, Platform.send_by_session)
             sent = await self.context.send_message(target, MessageChain().message(text))
             if sent is False:
                 raise RuntimeError('平台未找到或拒绝发送')
@@ -54,7 +57,7 @@ class NJUPlugin(Star):
         if self.service is None:
             return error_response('通知服务尚未就绪', status_code=503)
         return json_response({'channels': [{**c, **recipient_fields(c), 'url': self._url(c)} for c in self.service.channels()],
-                              'platforms': qq_platforms(self.context),
+                              'platforms': notification_platforms(self.context, Platform.send_by_session),
                               'public_base_url': self.config.get('public_base_url', ''), 'modules': self.service.status()})
 
     async def save_channel(self):
@@ -62,9 +65,16 @@ class NJUPlugin(Star):
             payload = await request.json(default={})
             if not isinstance(payload, dict):
                 raise ValueError('配置格式不正确')
-            if 'platform_id' in payload and payload['platform_id'] not in {p['id'] for p in qq_platforms(self.context)}:
-                raise ValueError('所选 QQ 机器人已不存在，请刷新列表后重选')
-            channel = self.service.save_channel(payload)
+            id_format = 'qq_number'
+            if 'platform_id' in payload:
+                selected = next((p for p in notification_platforms(self.context, Platform.send_by_session)
+                                 if p['id'] == payload['platform_id']), None)
+                if selected is None:
+                    raise ValueError('所选机器人已不存在，请刷新列表后重选')
+                if selected['proactive'] is False and payload.get('enabled', payload.get('module', 'checkin') == 'checkin'):
+                    raise ValueError('该适配器不支持主动通知，只能将通道保存为关闭状态')
+                id_format = selected['id_format']
+            channel = self.service.save_channel(payload, id_format=id_format)
             return json_response({**channel, **recipient_fields(channel), 'url': self._url(channel)})
         except (ValueError, TypeError) as error:
             return error_response(str(error), status_code=400)

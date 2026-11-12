@@ -7,13 +7,26 @@ function message(text, error=false){$('status').textContent=text;$('status').dat
 function element(tag,text,className){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;}
 function button(text,action,className){const b=element('button',text,className);b.type='button';b.onclick=async()=>{b.disabled=true;try{await action();}catch(e){message(e.message||'操作失败，请重试',true);}finally{b.disabled=false;}};return b;}
 function updateSave(){
- $('save').disabled=busy||(!preserveLegacy&&!$('platform').value);
- $('platform-hint').textContent=platforms.length?'只有一个机器人时会自动选择；多个机器人可分别创建通道。':'还没有可选择的 QQ 机器人。请先在 AstrBot 的消息平台中添加 OneBot v11 连接，再刷新此页。';
+ const selected=platforms.find(p=>p.id===$('platform').value);
+ const unsupported=selected?.proactive===false;
+ if(!preserveLegacy&&unsupported)$('enabled').checked=false;
+ $('enabled').disabled=busy||(!preserveLegacy&&unsupported);
+ $('save').disabled=busy||(!preserveLegacy&&!selected);
+ $('platform-hint').textContent=platforms.length?'列出所有已配置的机器人；只有一个时自动选择。':'还没有可选择的机器人。请先在 AstrBot 的消息平台中添加任意协议的机器人，再刷新此页。';
+ $('group-label').textContent=selected?.group_label||'群聊 / 频道 ID';
+ $('user-label').textContent=selected?.user_label||'私聊会话 ID';
+ $('groups').placeholder=selected?.group_placeholder||'填写该协议的群聊或频道 ID';
+ $('users').placeholder=selected?.user_placeholder||'填写该协议的私聊目标 ID';
+ for(const id of ['groups','users'])$(id).inputMode=selected?.id_format==='qq_number'?'numeric':'text';
+ let hint=selected?.hint||'选定机器人后，会显示该协议的接收目标格式。';
+ if(unsupported)hint+=' 该适配器不支持主动通知，通道只能保存为关闭状态。';
+ else if(selected?.proactive===null)hint+=' 机器人尚未运行，主动通知能力将在连接后检查。';
+ $('protocol-hint').textContent=hint;
 }
 function fillPlatforms(selected=''){
  const select=$('platform');select.replaceChildren();
- if(platforms.length!==1)select.append(new Option(platforms.length?'请选择发送消息的机器人':'请先接入 QQ 机器人',''));
- for(const p of platforms)select.append(new Option(`${p.label} · ${states[p.status]||'未连接'}`,p.id));
+ if(platforms.length!==1)select.append(new Option(platforms.length?'请选择发送消息的机器人':'请先添加机器人',''));
+ for(const p of platforms)select.append(new Option(`${p.label} · ${p.protocol_label||p.type} · ${states[p.status]||'未连接'}${p.proactive===false?' · 不支持主动通知':''}`,p.id));
  select.value=selected||(platforms.length===1?platforms[0].id:'');updateSave();
 }
 function reset(){editing=null;preserveLegacy=false;$('form').reset();$('module').disabled=false;$('heading').textContent='新建通知通道';$('save').textContent='创建通道';$('cancel').hidden=true;$('number-fields').hidden=false;$('legacy-hint').hidden=true;fillPlatforms();updateCount();}
@@ -49,7 +62,7 @@ async function load(){
   const row=element('div',undefined,'api-row'),api=element('input');api.readOnly=true;api.value=c.url;api.setAttribute('aria-label',`${c.name} API 地址`);
   const cp=button('复制 API',()=>copy(c.url,api),'primary');cp.disabled=!c.url;row.append(api,cp);section.append(row);
   const actions=element('div',undefined,'actions');actions.append(button('编辑',()=>beginEdit(c)));
-  actions.append(button(c.enabled?'关闭通道':'启用通道',async()=>{await bridge.apiPost('channels/save',{id:c.id,name:c.name,module:c.module,targets:c.targets,enabled:!c.enabled});await load();}));
+  actions.append(button(c.enabled?'关闭通道':'启用通道',async()=>{if(!c.enabled&&bot?.proactive===false){message('该适配器不支持主动通知',true);return;}await bridge.apiPost('channels/save',{id:c.id,name:c.name,module:c.module,targets:c.targets,enabled:!c.enabled});await load();}));
   actions.append(button('重置 API',async()=>{if(!confirm('重置后旧地址立即失效，确定继续？'))return;await bridge.apiPost('channels/rotate',{id:c.id});await load();message('API 已重置，请重新复制到客户端。');}));
   actions.append(button('删除',async()=>{if(!confirm('删除此通道及待发送通知？'))return;await bridge.apiPost('channels/delete',{id:c.id});if(editing?.id===c.id)reset();await load();},'danger'));
   section.append(actions);$('channels').append(section);
@@ -66,6 +79,6 @@ $('form').onsubmit=async event=>{
  }catch(e){message(e.message,true);}finally{busy=false;updateSave();}
 };
 $('platform').onchange=updateSave;$('groups').oninput=updateCount;$('users').oninput=updateCount;
-$('module').onchange=()=>{$('enabled').checked=$('module').value==='checkin';};
+$('module').onchange=()=>{$('enabled').checked=$('module').value==='checkin';updateSave();};
 $('cancel').onclick=reset;$('refresh').onclick=async()=>{try{await load();message('列表已刷新');}catch(e){message(e.message,true);}};
 try{await bridge.ready();await load();}catch(e){message(e.message||'加载失败，请刷新后重试',true);}

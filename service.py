@@ -42,15 +42,15 @@ class NotificationService:
         row = self.db.execute('SELECT data FROM channels WHERE id=?', (channel_id,)).fetchone()
         return json.loads(row['data']) if row else None
 
-    def save_channel(self, value):
+    def save_channel(self, value, id_format='qq_number'):
         if not isinstance(value, dict):
             raise ValueError('配置格式不正确')
         name, module = str(value.get('name', '')).strip(), value.get('module', 'checkin')
-        targets = resolve_targets(value)
+        targets = resolve_targets(value, id_format)
         if not name or len(name) > 80 or module not in ('checkin', 'course', 'venue'):
             raise ValueError('请填写通道名称并选择有效业务')
         if not isinstance(targets, list) or not 1 <= len(targets) <= 30 or any(
-            not isinstance(x, str) or not 1 <= len(x) <= 300 or
+            not isinstance(x, str) or not 1 <= len(x) <= 512 or
             (':GroupMessage:' not in x and ':FriendMessage:' not in x) for x in targets
         ):
             raise ValueError('每个通道请设置 1–30 个有效接收人或群聊')
