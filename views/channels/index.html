@@ -1,18 +1,20 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NJU小工具管理bot · 通知通道</title><link rel="stylesheet" href="./style.css?v=2.2.0"></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NJU小工具管理bot · 通知通道</title><link rel="stylesheet" href="./style.css?v=2.3.0"></head>
 <body><main>
 <header><div><h1>通知通道</h1><p class="muted">为每条 API 指定接收消息的群聊、频道和私聊，再复制到 APP 或 Web。</p></div><button id="refresh" type="button">刷新列表</button></header>
 <div id="modules" class="module-list"></div><p id="status" role="status" aria-live="polite"></p>
 <section class="card"><h2 id="heading">新建通知通道</h2><form id="form">
 <div class="grid"><label>通道名称<input id="name" required maxlength="80" placeholder="例如：高数签到通知"></label><label>通知业务<select id="module"><option value="checkin">签到结果</option><option value="course">抢课结果（待拓展）</option><option value="venue">抢场结果（待拓展）</option></select></label></div>
 <div id="number-fields"><label>发送消息的机器人<select id="platform" aria-describedby="platform-hint"></select></label><p id="platform-hint" class="hint"></p>
-<div class="grid"><label><span id="group-label">群聊 / 频道 ID</span><textarea id="groups" rows="4" placeholder="填写目标群聊或频道 ID，多个目标可换行或用逗号分隔"></textarea><small>机器人需要具有该目标的发送权限。</small></label>
-<label><span id="user-label">私聊会话 ID</span><textarea id="users" rows="4" placeholder="填写目标私聊会话 ID，多个目标可换行或用逗号分隔"></textarea><small>机器人需要能够向该目标发送私聊。</small></label></div>
-<p id="protocol-hint" class="notice">选定机器人后，会显示该协议的接收目标格式。</p>
-<p id="recipient-count" class="hint">群聊和私聊可同时填写，合计最多 30 个接收目标。</p></div>
+<p class="notice">在目标群里 @机器人发送一条消息，或让接收人私聊机器人一次，再点击「刷新列表」。勾选后才会接收通知，无需填写 OpenID。</p>
+<label class="search-label">选择接收目标<input type="search" id="recipient-search" placeholder="搜索群名、昵称或备注" aria-label="搜索接收目标"></label>
+<div class="grid recipient-grid"><section aria-labelledby="groups-heading"><h3 id="groups-heading">群聊 / 频道</h3><div id="group-options" class="recipient-list"></div></section>
+<section aria-labelledby="users-heading"><h3 id="users-heading">私聊用户</h3><div id="user-options" class="recipient-list"></div></section></div>
+<p id="protocol-hint" class="hint"></p>
+<p id="recipient-count" class="hint">群聊和私聊可同时勾选，合计最多 30 个接收目标。</p></div>
 <p id="legacy-hint" class="notice" hidden>这个旧通道的接收范围会原样保留。如需更换机器人或接收范围，请新建通道。</p>
 <div class="form-footer"><label class="inline"><input type="checkbox" id="enabled" checked>启用此通道</label><div><button type="submit" class="primary" id="save">创建通道</button><button id="cancel" type="button" hidden>取消编辑</button></div></div>
 </form></section>
 <div class="section-heading"><h2>已有通道</h2><span id="channel-count" class="muted"></span></div><div id="channels"></div>
 <p class="hint">API 地址包含发送凭证，请妥善保存。重置 API 后，需要将新地址重新粘贴到客户端。</p>
-</main><script type="module" src="./app.js?v=2.2.0"></script></body></html>
+</main><script type="module" src="./app.js?v=2.3.0"></script></body></html>

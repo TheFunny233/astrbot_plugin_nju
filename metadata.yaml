@@ -1,7 +1,7 @@
 name: astrbot_plugin_nju
 display_name: NJU小工具管理bot
 desc: 签到结果通知与独立抢课、抢场扩展入口，支持多通道和指定群聊/私聊。
-version: v2.2.0
+version: v2.3.0
 author: TheFunny233
 repo: https://github.com/TheFunny233/astrbot_plugin_nju
 astrbot_version: '>=4.29.4'

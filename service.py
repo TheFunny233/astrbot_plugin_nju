@@ -18,6 +18,8 @@ class NotificationService:
         self.db.executescript('''
             CREATE TABLE IF NOT EXISTS channels(id TEXT PRIMARY KEY, data TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS events(channel TEXT, event TEXT, created REAL, PRIMARY KEY(channel,event));
+            CREATE TABLE IF NOT EXISTS recipients(target TEXT PRIMARY KEY, platform_id TEXT NOT NULL,
+                kind TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', alias TEXT NOT NULL DEFAULT '', last_seen REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS deliveries(id INTEGER PRIMARY KEY, module TEXT, channel TEXT,
                 event TEXT, target TEXT, message TEXT, attempts INTEGER DEFAULT 0,
                 due REAL DEFAULT 0, state TEXT DEFAULT 'pending');
@@ -42,11 +44,52 @@ class NotificationService:
         row = self.db.execute('SELECT data FROM channels WHERE id=?', (channel_id,)).fetchone()
         return json.loads(row['data']) if row else None
 
+    def record_recipient(self, recipient):
+        with self.db:
+            self.db.execute('''INSERT INTO recipients(target,platform_id,kind,name,last_seen) VALUES (?,?,?,?,?)
+                ON CONFLICT(target) DO UPDATE SET
+                name=CASE WHEN excluded.name!='' THEN excluded.name ELSE recipients.name END,
+                last_seen=excluded.last_seen''',
+                (recipient['target'], recipient['platform_id'], recipient['kind'], recipient['name'], time.time()))
+
+    def recipients(self):
+        result = {row['target']: {**dict(row), 'observed': True} for row in
+                  self.db.execute('SELECT * FROM recipients ORDER BY last_seen DESC')}
+        # Old channels remain editable even before their next interaction.
+        for channel in self.channels():
+            for target in channel['targets']:
+                parts = target.split(':', 2)
+                if target not in result and len(parts) == 3 and parts[1] in ('GroupMessage', 'FriendMessage'):
+                    result[target] = {'target': target, 'platform_id': parts[0],
+                                      'kind': 'group' if parts[1] == 'GroupMessage' else 'user',
+                                      'name': '', 'alias': '', 'last_seen': None, 'observed': False}
+        return list(result.values())
+
+    def rename_recipient(self, target, alias):
+        if not isinstance(alias, str) or len(alias) > 80 or any(ord(char) < 32 or ord(char) == 127 for char in alias):
+            raise ValueError('备注请填写不超过 80 个字符的单行文本')
+        with self.db:
+            changed = self.db.execute('UPDATE recipients SET alias=? WHERE target=?', (alias.strip(), target)).rowcount
+        if not changed:
+            raise ValueError('这个目标尚未自动记录，请先在群里 @机器人或私聊一次')
+
+    def selected_targets(self, value):
+        targets = value.get('recipient_targets')
+        if not isinstance(targets, list) or not 1 <= len(targets) <= 30 or any(not isinstance(x, str) for x in targets):
+            raise ValueError('请勾选 1–30 个接收目标')
+        known = {r['target'] for r in self.recipients()}
+        platform_id = value.get('platform_id')
+        if not isinstance(platform_id, str) or not platform_id:
+            raise ValueError('请选择发送消息的机器人')
+        if any(target not in known or target.split(':', 1)[0] != platform_id for target in targets):
+            raise ValueError('接收目标已变化或不属于所选机器人，请刷新列表后重选')
+        return list(dict.fromkeys(targets))
+
     def save_channel(self, value, id_format='qq_number'):
         if not isinstance(value, dict):
             raise ValueError('配置格式不正确')
         name, module = str(value.get('name', '')).strip(), value.get('module', 'checkin')
-        targets = resolve_targets(value, id_format)
+        targets = self.selected_targets(value) if 'recipient_targets' in value else resolve_targets(value, id_format)
         if not name or len(name) > 80 or module not in ('checkin', 'course', 'venue'):
             raise ValueError('请填写通道名称并选择有效业务')
         if not isinstance(targets, list) or not 1 <= len(targets) <= 30 or any(

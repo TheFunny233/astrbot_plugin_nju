@@ -1,14 +1,17 @@
 import asyncio
+from sys import maxsize
 from pathlib import Path
 from aiohttp import web
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star
 from astrbot.api.platform import Platform
+from astrbot.api.message_components import At
 from astrbot.api.web import error_response, json_response, request
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 from .service import NotificationService
 from .targets import notification_platforms, prepare_destination, recipient_fields
+from .discovery import recipient_from_event
 
 class NJUPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -16,7 +19,8 @@ class NJUPlugin(Star):
         self.config, self.runner, self.service = config, None, None
         for path, handler, methods in [
             ('channels', self.channels, ['GET']), ('channels/save', self.save_channel, ['POST']),
-            ('channels/delete', self.delete_channel, ['POST']), ('channels/rotate', self.rotate_channel, ['POST'])]:
+            ('channels/delete', self.delete_channel, ['POST']), ('channels/rotate', self.rotate_channel, ['POST']),
+            ('recipients/rename', self.rename_recipient, ['POST'])]:
             context.register_web_api('/astrbot_plugin_nju/' + path, handler, methods, 'NJU 通知管理')
 
     async def initialize(self):
@@ -57,6 +61,7 @@ class NJUPlugin(Star):
         if self.service is None:
             return error_response('通知服务尚未就绪', status_code=503)
         return json_response({'channels': [{**c, **recipient_fields(c), 'url': self._url(c)} for c in self.service.channels()],
+                              'recipients': self.service.recipients(),
                               'platforms': notification_platforms(self.context, Platform.send_by_session),
                               'public_base_url': self.config.get('public_base_url', ''), 'modules': self.service.status()})
 
@@ -91,6 +96,29 @@ class NJUPlugin(Star):
             return json_response({**channel, 'url': self._url(channel)})
         except ValueError as error:
             return error_response(str(error), status_code=400)
+
+    async def rename_recipient(self):
+        try:
+            payload = await request.json(default={})
+            if not isinstance(payload, dict) or not isinstance(payload.get('target'), str):
+                raise ValueError('请选择接收目标')
+            self.service.rename_recipient(payload['target'], payload.get('alias', ''))
+            return json_response({'ok': True})
+        except (ValueError, TypeError) as error:
+            return error_response(str(error), status_code=400)
+
+    @filter.event_message_type(filter.EventMessageType.ALL, priority=maxsize)
+    async def discover_recipient(self, event: AstrMessageEvent):
+        """Record mentioned groups and private conversations without replying."""
+        if self.service is None:
+            return
+        try:
+            recipient = recipient_from_event(event, At)
+            if recipient:
+                self.service.record_recipient(recipient)
+        except Exception:
+            # Discovery must not stop command handling or notification workers.
+            logger.warning('NJU 接收目标记录暂时失败，不影响其他功能')
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command('nju会话')
