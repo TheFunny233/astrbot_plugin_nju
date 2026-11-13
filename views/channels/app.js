@@ -110,6 +110,6 @@ $('form').onsubmit=async event=>{
 };
 $('platform').onchange=()=>{selectedTargets=new Set();$('recipient-search').value='';renderRecipients();};
 $('recipient-search').oninput=renderRecipients;
-$('module').onchange=()=>{$('enabled').checked=$('module').value==='checkin';updateSave();};
+$('module').onchange=()=>{$('enabled').checked=['checkin','venue'].includes($('module').value);updateSave();};
 $('cancel').onclick=reset;$('refresh').onclick=async()=>{try{await load();message('列表已刷新，已勾选的目标会保留');}catch(e){message(e.message,true);}};
 try{await bridge.ready();await load();}catch(e){message(e.message||'加载失败，请刷新后重试',true);}

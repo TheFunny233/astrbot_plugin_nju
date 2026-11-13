@@ -76,7 +76,7 @@ class NJUPlugin(Star):
                                  if p['id'] == payload['platform_id']), None)
                 if selected is None:
                     raise ValueError('所选机器人已不存在，请刷新列表后重选')
-                if selected['proactive'] is False and payload.get('enabled', payload.get('module', 'checkin') == 'checkin'):
+                if selected['proactive'] is False and payload.get('enabled', payload.get('module', 'checkin') in ('checkin','venue')):
                     raise ValueError('该适配器不支持主动通知，只能将通道保存为关闭状态')
                 id_format = selected['id_format']
             channel = self.service.save_channel(payload, id_format=id_format)

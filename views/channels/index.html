@@ -4,7 +4,7 @@
 <header><div><h1>通知通道</h1><p class="muted">为每条 API 指定接收消息的群聊、频道和私聊，再复制到 APP 或 Web。</p></div><button id="refresh" type="button">刷新列表</button></header>
 <div id="modules" class="module-list"></div><p id="status" role="status" aria-live="polite"></p>
 <section class="card"><h2 id="heading">新建通知通道</h2><form id="form">
-<div class="grid"><label>通道名称<input id="name" required maxlength="80" placeholder="例如：高数签到通知"></label><label>通知业务<select id="module"><option value="checkin">签到结果</option><option value="course">抢课结果（待拓展）</option><option value="venue">抢场结果（待拓展）</option></select></label></div>
+<div class="grid"><label>通道名称<input id="name" required maxlength="80" placeholder="例如：高数签到通知"></label><label>通知业务<select id="module"><option value="checkin">签到结果</option><option value="course">抢课结果（待拓展）</option><option value="venue">场馆预约结果</option></select></label></div>
 <div id="number-fields"><label>发送消息的机器人<select id="platform" aria-describedby="platform-hint"></select></label><p id="platform-hint" class="hint"></p>
 <p class="notice">在目标群里 @机器人发送一条消息，或让接收人私聊机器人一次，再点击「刷新列表」。勾选后才会接收通知，无需填写 OpenID。</p>
 <label class="search-label">选择接收目标<input type="search" id="recipient-search" placeholder="搜索群名、昵称或备注" aria-label="搜索接收目标"></label>

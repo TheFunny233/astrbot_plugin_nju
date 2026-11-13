@@ -97,7 +97,7 @@ class NotificationService:
             (':GroupMessage:' not in x and ':FriendMessage:' not in x) for x in targets
         ):
             raise ValueError('每个通道请设置 1–30 个有效接收人或群聊')
-        enabled = value.get('enabled', module == 'checkin')
+        enabled = value.get('enabled', module in ('checkin','venue'))
         if not isinstance(enabled, bool):
             raise ValueError('enabled 必须为布尔值')
         old = self.get(str(value.get('id', '')))
@@ -214,7 +214,7 @@ class NotificationService:
                 self.db.execute("UPDATE deliveries SET state='sent',attempts=?,message='' WHERE id=?", (attempts, row['id']))
 
     def status(self):
-        return {name: {'available': name in self.modules, 'implemented': name == 'checkin', 'error': self.errors.get(name, ''),
+        return {name: {'available': name in self.modules, 'implemented': name in ('checkin','venue'), 'error': self.errors.get(name, ''),
                        'pending': self.db.execute("SELECT count(*) FROM deliveries WHERE module=? AND state IN ('pending','sending')", (name,)).fetchone()[0],
                        'failed': self.db.execute("SELECT count(*) FROM deliveries WHERE module=? AND state='failed'", (name,)).fetchone()[0]}
                 for name in ('checkin', 'course', 'venue')}
